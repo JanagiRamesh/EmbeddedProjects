@@ -28,6 +28,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "../Custom_Libs/Inc/CAN_Driver.h"
+#include "../Custom_Libs/Inc/Debug.h"
+#include "../Custom_Libs/Inc/CAN_Application.h"
+#include "../Custom_Libs/Inc/Enumeration.h"
 
 /* USER CODE END Includes */
 
@@ -99,16 +103,79 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
+  CANSetup();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint8_t data[8]={10,20,30,40,50,60,70,80};
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+/*  *** Light Dependent Resistor ***    */
+	  uint16_t ldr_value = 0, ldr_buff[16];
+
+	  HAL_ADC_PollForConversion(&hadc1, 10);
+	  ldr_value = HAL_ADC_GetValue(&hadc1);
+	  sprintf(ldr_buff,"%lu",ldr_value);
+	  __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_4, ldr_value);
+	  DebugPrint(ldr_buff);
+
+/*  *** Negative Temprature Sensor *** */
+	  uint32_t adc_value=0;
+
+	  HAL_ADC_Start(&hadc1);
+	  HAL_ADC_PollForConversion(&hadc1,100);
+	  adc_value = HAL_ADC_GetValue(&hadc1);
+	  __HAL_TIM_SetCompare(&htim2,TIM_CHANNEL_4,adc_value);
+
+/***pot****/
+	  uint32_t buff[16];
+
+	  HAL_ADC_PollForConversion(&hadc1, 10);
+	  adc_value = HAL_ADC_GetValue(&hadc1);
+	  sprintf(buff,"%lu",adc_value);
+	  __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_4, adc_value);
+	  DebugPrint(buff);
+
+
+/* ***   Interfacing with DC MOTOR ***     */
+/*  ***  if (IN-1 = 0) and (IN-2 = 0) Motor Should in IDLE State  ***  */
+	  if((HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_RESET) && (HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_RESET))
+	  {
+		  HAL_GPIO_WritePin(Motor_Driver_1_GPIO_Port, Motor_Driver_1_Pin,GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(Motor_Driver_2_GPIO_Port, Motor_Driver_2_Pin,GPIO_PIN_RESET);
+	  }
+
+/*  ***  if (IN-1 = 0) and (IN-2 = 1) Motor Should Anti-Clockwise State  ***  */
+	  if((HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_RESET) && (HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_SET))
+	  {
+		  HAL_GPIO_WritePin(Motor_Driver_1_GPIO_Port, Motor_Driver_1_Pin,GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(Motor_Driver_2_GPIO_Port, Motor_Driver_2_Pin,GPIO_PIN_SET);
+	  }
+
+/*  ***  if (IN-1 = 1) and (IN-2 = 0) Motor Should Clockwise State  ***  */
+	  if((HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_SET) && (HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_RESET))
+	  {
+		  HAL_GPIO_WritePin(Motor_Driver_1_GPIO_Port, Motor_Driver_1_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(Motor_Driver_2_GPIO_Port, Motor_Driver_2_Pin,GPIO_PIN_RESET);
+	  }
+
+/*  ***  if (IN-1 = 1) and (IN-2 = 1) Motor Should in IDLE State  ***  */
+	  if((HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_SET) && (HAL_GPIO_ReadPin(DC_Motor_IN1_GPIO_Port,DC_Motor_IN1_Pin) == GPIO_PIN_SET))
+	  {
+		  HAL_GPIO_WritePin(Motor_Driver_1_GPIO_Port, Motor_Driver_1_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(Motor_Driver_2_GPIO_Port, Motor_Driver_2_Pin,GPIO_PIN_SET);
+	  }
+
+
+
+/*   *** CAN Transmission  ***   */
+	  Transmit_CANID(ID1,S,data,8);
+	  HAL_Delay(1000);
   }
   /* USER CODE END 3 */
 }
@@ -167,7 +234,38 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+/*  *** Bulb Interfacing ***      */
+	if(GPIO_Pin == Lamp_Input_Pin)
+	{
+		HAL_GPIO_WritePin(Lamp_Output_GPIO_Port, Lamp_Output_Pin,GPIO_PIN_SET);
+	}
 
+/*  *** CPU FAN-Interfacing ***      */
+	if(GPIO_Pin == CPU_FAN_Input_Pin)
+	{
+		HAL_GPIO_WritePin(CPU_FAN_Output_GPIO_Port, CPU_FAN_Output_Pin,GPIO_PIN_SET);
+	}
+
+/*  *** Relay Interfacing ***  */
+	if(GPIO_Pin == Relay_Input_Pin)
+	{
+		HAL_GPIO_WritePin(Relay_Output_GPIO_Port, Relay_Output_Pin,GPIO_PIN_SET);
+	}
+
+/*  *** SubMersible Water Pump *** */
+	if(GPIO_Pin == SubmerciblePumpIn_Pin)
+	{
+		HAL_GPIO_WritePin(SubmerciblePumpOut_GPIO_Port,SubmerciblePumpOut_Pin,GPIO_PIN_SET);
+	}
+
+/*  *** SubMersible Water Pump *** */
+	if(GPIO_Pin == ON_OFF_Input_GPIO_Port)
+	{
+		HAL_GPIO_WritePin(GPIOG,GPIO_PIN_14,GPIO_PIN_RESET);
+	}
+}
 /* USER CODE END 4 */
 
 /**
